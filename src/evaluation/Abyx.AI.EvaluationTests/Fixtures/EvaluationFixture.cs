@@ -1,5 +1,13 @@
+using System.ClientModel;
 using System.Text.Json;
 using Abyx.AI.EvaluationTests.Models;
+using Azure.AI.OpenAI;
+using Azure.Identity;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.AI.Evaluation;
+using Microsoft.Extensions.AI.Evaluation.Quality;
+using Microsoft.Extensions.AI.Evaluation.Reporting;
+using Microsoft.Extensions.AI.Evaluation.Reporting.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.KernelMemory;
 
@@ -8,12 +16,26 @@ namespace Abyx.AI.EvaluationTests.Fixtures;
 public class EvaluationFixture : IAsyncLifetime
 {
     public IKernelMemory Memory { get; internal set; } = null!;
+    public ReportingConfiguration ReportingConfigurationWithEquivalenceAndGroundedness { get; internal set; } = null!;
 
     public async Task InitializeAsync()
     {
-        InitialiseKernelMemory();
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
+            .AddJsonFile("testsettings.json", optional: false, reloadOnChange: false)
+            .Build(); 
+        
+        InitialiseKernelMemory(configuration);
 
         await ImportRagDocuments();
+        
+        ReportingConfigurationWithEquivalenceAndGroundedness =
+            DiskBasedReportingConfiguration.Create(
+                storageRootPath: configuration.GetValue("StorageRootPath", string.Empty),
+                evaluators: [new EquivalenceEvaluator(), new GroundednessEvaluator()],
+                chatConfiguration: GetAzureOpenAIChatConfiguration(configuration),
+                enableResponseCaching: false,
+                executionName: $"Execution_{DateTime.Now:yyyyMMddTHHmmss}");
     }
 
     private async Task ImportRagDocuments()
@@ -23,16 +45,11 @@ public class EvaluationFixture : IAsyncLifetime
             documentId: "black-mirror-story-01");
     }
 
-    private void InitialiseKernelMemory()
+    private void InitialiseKernelMemory(IConfiguration configuration)
     {
         var azureOpenAiTextConfig = new AzureOpenAIConfig();
         var azureOpenAiEmbeddingConfig = new AzureOpenAIConfig();
         var azureAiSearchConfig = new AzureAISearchConfig();
-        
-        var configuration = new ConfigurationBuilder()
-            .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
-            .AddJsonFile("testsettings.json", optional: false, reloadOnChange: false)
-            .Build();    
         
         configuration
             .BindSection("KernelMemory:Services:AzureOpenAIText", azureOpenAiTextConfig)
@@ -52,5 +69,20 @@ public class EvaluationFixture : IAsyncLifetime
     public async Task DisposeAsync()
     {
         await Memory.DeleteIndexAsync();
+    }
+    
+    private static ChatConfiguration GetAzureOpenAIChatConfiguration(IConfiguration configuration)
+    {
+        var azureOpenAiTextConfig = new AzureOpenAIConfig();
+        configuration
+            .BindSection("KernelMemory:Services:AzureOpenAIText", azureOpenAiTextConfig);
+            
+        IChatClient client =
+            new AzureOpenAIClient(
+                    new Uri(azureOpenAiTextConfig.Endpoint), 
+                    new ApiKeyCredential(azureOpenAiTextConfig.APIKey))
+                .AsChatClient(modelId: azureOpenAiTextConfig.Deployment);
+        
+        return new ChatConfiguration(client);
     }
 }

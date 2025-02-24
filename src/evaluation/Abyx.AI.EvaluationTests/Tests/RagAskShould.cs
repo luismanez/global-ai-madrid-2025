@@ -2,6 +2,10 @@ using System.Text.Json;
 using Abyx.AI.EvaluationTests.Fixtures;
 using Abyx.AI.EvaluationTests.Models;
 using FluentAssertions;
+using FluentAssertions.Execution;
+using Microsoft.Extensions.AI.Evaluation;
+using Microsoft.Extensions.AI.Evaluation.Quality;
+using Microsoft.Extensions.AI.Evaluation.Reporting;
 using Microsoft.KernelMemory;
 
 namespace Abyx.AI.EvaluationTests.Tests;
@@ -9,11 +13,13 @@ namespace Abyx.AI.EvaluationTests.Tests;
 public class RagAskShould : IClassFixture<EvaluationFixture>
 {
     private readonly IKernelMemory? _memory;
+    private readonly ReportingConfiguration _reportingConfigurationWithEquivalenceAndGroundedness;
 
     public RagAskShould(
         EvaluationFixture fixture)
     {
         _memory = fixture.Memory;
+        _reportingConfigurationWithEquivalenceAndGroundedness = fixture.ReportingConfigurationWithEquivalenceAndGroundedness;
     }
 
     public static IEnumerable<object[]> GetQuestionsToEvaluate()
@@ -26,8 +32,49 @@ public class RagAskShould : IClassFixture<EvaluationFixture>
 
     [Theory]
     [MemberData(nameof(GetQuestionsToEvaluate))]
-    public void EvaluateQuestion(EvaluationItem question)
+    public async Task EvaluateQuestion(EvaluationItem question)
     {
         question.Query.Should().NotBeNull();
+
+        var responseFromRagSystem = await _memory!.AskAsync(question.Query);
+
+        var answerFromRagSystem = responseFromRagSystem.Result;
+        var facts = string.Join(
+            "\n",
+            responseFromRagSystem.RelevantSources
+                .SelectMany(c => c.Partitions)
+                .OrderByDescending(p => p.Relevance)
+                .Take(5)
+                .Select(p => p.Text)
+        );
+
+        await using var scenarioRun =
+            await _reportingConfigurationWithEquivalenceAndGroundedness.CreateScenarioRunAsync($"Question_{question.Id}");
+
+        var baselineResponseForEquivalenceEvaluator =
+            new EquivalenceEvaluatorContext(question.GroundTruth);
+
+        var groundingContextForGroundednessEvaluator =
+            new GroundednessEvaluatorContext(facts);
+
+        var evaluationResult =
+            await scenarioRun.EvaluateAsync(
+                question.Query,
+                answerFromRagSystem,
+                [baselineResponseForEquivalenceEvaluator, groundingContextForGroundednessEvaluator]);
+
+        using var _ = new AssertionScope();
+
+        var equivalence = evaluationResult.Get<NumericMetric>(EquivalenceEvaluator.EquivalenceMetricName);
+        equivalence.Interpretation!.Failed.Should().NotBe(true);
+        equivalence.Interpretation.Rating.Should().BeOneOf(EvaluationRating.Good, EvaluationRating.Exceptional);
+        equivalence.ContainsDiagnostics().Should().BeFalse();
+        equivalence.Value.Should().BeGreaterThanOrEqualTo(3);
+
+        var groundedness = evaluationResult.Get<NumericMetric>(GroundednessEvaluator.GroundednessMetricName);
+        groundedness.Interpretation!.Failed.Should().NotBe(true);
+        groundedness.Interpretation.Rating.Should().BeOneOf(EvaluationRating.Good, EvaluationRating.Exceptional);
+        groundedness.ContainsDiagnostics().Should().BeFalse();
+        groundedness.Value.Should().BeGreaterThanOrEqualTo(3);
     }
 }
