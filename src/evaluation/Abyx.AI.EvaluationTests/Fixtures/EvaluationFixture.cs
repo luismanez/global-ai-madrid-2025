@@ -32,7 +32,7 @@ public class EvaluationFixture : IAsyncLifetime
         ReportingConfigurationWithEquivalenceAndGroundedness =
             DiskBasedReportingConfiguration.Create(
                 storageRootPath: configuration.GetValue("StorageRootPath", string.Empty),
-                evaluators: [new EquivalenceEvaluator(), new GroundednessEvaluator()],
+                evaluators: [new EquivalenceEvaluator(), new GroundednessEvaluator(), new RelevanceTruthAndCompletenessEvaluator()],
                 chatConfiguration: GetAzureOpenAIChatConfiguration(configuration),
                 enableResponseCaching: false,
                 executionName: $"Execution_{DateTime.Now:yyyyMMddTHHmmss}");

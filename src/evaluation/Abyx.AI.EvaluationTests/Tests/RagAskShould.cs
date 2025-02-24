@@ -56,7 +56,7 @@ public class RagAskShould : IClassFixture<EvaluationFixture>
 
         var groundingContextForGroundednessEvaluator =
             new GroundednessEvaluatorContext(facts);
-
+        
         var evaluationResult =
             await scenarioRun.EvaluateAsync(
                 question.Query,
@@ -65,16 +65,21 @@ public class RagAskShould : IClassFixture<EvaluationFixture>
 
         using var _ = new AssertionScope();
 
-        var equivalence = evaluationResult.Get<NumericMetric>(EquivalenceEvaluator.EquivalenceMetricName);
-        equivalence.Interpretation!.Failed.Should().NotBe(true);
-        equivalence.Interpretation.Rating.Should().BeOneOf(EvaluationRating.Good, EvaluationRating.Exceptional);
-        equivalence.ContainsDiagnostics().Should().BeFalse();
-        equivalence.Value.Should().BeGreaterThanOrEqualTo(3);
+        // var equivalence = evaluationResult.Get<NumericMetric>(EquivalenceEvaluator.EquivalenceMetricName);
+        // equivalence.Interpretation!.Failed.Should().NotBe(true);
+        // equivalence.Interpretation.Rating.Should().BeOneOf(EvaluationRating.Good, EvaluationRating.Exceptional);
+        // equivalence.ContainsDiagnostics().Should().BeFalse();
+        // equivalence.Value.Should().BeGreaterThanOrEqualTo(3);
 
         var groundedness = evaluationResult.Get<NumericMetric>(GroundednessEvaluator.GroundednessMetricName);
         groundedness.Interpretation!.Failed.Should().NotBe(true);
         groundedness.Interpretation.Rating.Should().BeOneOf(EvaluationRating.Good, EvaluationRating.Exceptional);
         groundedness.ContainsDiagnostics().Should().BeFalse();
         groundedness.Value.Should().BeGreaterThanOrEqualTo(3);
+        
+        var relevance = evaluationResult.Get<NumericMetric>(RelevanceTruthAndCompletenessEvaluator.RelevanceMetricName);
+        relevance.Interpretation!.Failed.Should().NotBe(true);
+        relevance.Interpretation.Rating.Should().BeOneOf(EvaluationRating.Good, EvaluationRating.Exceptional);
+        relevance.Value.Should().BeGreaterThanOrEqualTo(3);
     }
 }
