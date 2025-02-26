@@ -13,13 +13,13 @@ namespace Abyx.AI.EvaluationTests.Tests;
 public class RagAskShould : IClassFixture<EvaluationFixture>
 {
     private readonly IKernelMemory? _memory;
-    private readonly ReportingConfiguration _reportingConfigurationWithEquivalenceAndGroundedness;
+    private readonly ReportingConfiguration _reportingConfiguration;
 
     public RagAskShould(
         EvaluationFixture fixture)
     {
         _memory = fixture.Memory;
-        _reportingConfigurationWithEquivalenceAndGroundedness = fixture.ReportingConfigurationWithEquivalenceAndGroundedness;
+        _reportingConfiguration = fixture.ReportingConfigurationWithEquivalenceAndGroundedness;
     }
 
     public static IEnumerable<object[]> GetQuestionsToEvaluate()
@@ -49,7 +49,7 @@ public class RagAskShould : IClassFixture<EvaluationFixture>
         );
 
         await using var scenarioRun =
-            await _reportingConfigurationWithEquivalenceAndGroundedness.CreateScenarioRunAsync($"Question_{question.Id}");
+            await _reportingConfiguration.CreateScenarioRunAsync($"Question_{question.Id}");
 
         var baselineResponseForEquivalenceEvaluator =
             new EquivalenceEvaluatorContext(question.GroundTruth);
@@ -65,11 +65,11 @@ public class RagAskShould : IClassFixture<EvaluationFixture>
 
         using var _ = new AssertionScope();
 
-        // var equivalence = evaluationResult.Get<NumericMetric>(EquivalenceEvaluator.EquivalenceMetricName);
-        // equivalence.Interpretation!.Failed.Should().NotBe(true);
-        // equivalence.Interpretation.Rating.Should().BeOneOf(EvaluationRating.Good, EvaluationRating.Exceptional);
-        // equivalence.ContainsDiagnostics().Should().BeFalse();
-        // equivalence.Value.Should().BeGreaterThanOrEqualTo(3);
+        var equivalence = evaluationResult.Get<NumericMetric>(EquivalenceEvaluator.EquivalenceMetricName);
+        equivalence.Interpretation!.Failed.Should().NotBe(true);
+        equivalence.Interpretation.Rating.Should().BeOneOf(EvaluationRating.Good, EvaluationRating.Exceptional);
+        equivalence.ContainsDiagnostics().Should().BeFalse();
+        equivalence.Value.Should().BeGreaterThanOrEqualTo(3);
 
         var groundedness = evaluationResult.Get<NumericMetric>(GroundednessEvaluator.GroundednessMetricName);
         groundedness.Interpretation!.Failed.Should().NotBe(true);

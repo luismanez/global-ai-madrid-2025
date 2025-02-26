@@ -32,8 +32,11 @@ public class EvaluationFixture : IAsyncLifetime
         ReportingConfigurationWithEquivalenceAndGroundedness =
             DiskBasedReportingConfiguration.Create(
                 storageRootPath: configuration.GetValue("StorageRootPath", string.Empty),
-                evaluators: [new EquivalenceEvaluator(), new GroundednessEvaluator(), new RelevanceTruthAndCompletenessEvaluator()],
-                chatConfiguration: GetAzureOpenAIChatConfiguration(configuration),
+                evaluators: [
+                    new EquivalenceEvaluator(), 
+                    new GroundednessEvaluator(), 
+                    new RelevanceTruthAndCompletenessEvaluator(new RelevanceTruthAndCompletenessEvaluatorOptions(true))],
+                chatConfiguration: GetAzureOpenAiChatConfiguration(configuration),
                 enableResponseCaching: false,
                 executionName: $"Execution_{DateTime.Now:yyyyMMddTHHmmss}");
     }
@@ -71,13 +74,13 @@ public class EvaluationFixture : IAsyncLifetime
         await Memory.DeleteIndexAsync();
     }
     
-    private static ChatConfiguration GetAzureOpenAIChatConfiguration(IConfiguration configuration)
+    private static ChatConfiguration GetAzureOpenAiChatConfiguration(IConfiguration configuration)
     {
         var azureOpenAiTextConfig = new AzureOpenAIConfig();
         configuration
             .BindSection("KernelMemory:Services:AzureOpenAIText", azureOpenAiTextConfig);
             
-        IChatClient client =
+        var client =
             new AzureOpenAIClient(
                     new Uri(azureOpenAiTextConfig.Endpoint), 
                     new ApiKeyCredential(azureOpenAiTextConfig.APIKey))
