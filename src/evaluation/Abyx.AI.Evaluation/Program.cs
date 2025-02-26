@@ -3,6 +3,11 @@ using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
 using Microsoft.Extensions.AI.Evaluation.Quality;
+using Microsoft.Extensions.Configuration;
+
+var config = new ConfigurationBuilder()
+    .AddJsonFile("appsettings.json")
+    .Build();
 
 IList<ChatMessage> chatMessages = [
         new ChatMessage(
@@ -16,13 +21,13 @@ IList<ChatMessage> chatMessages = [
             ChatRole.User,
             "How far is the planet Venus from the Earth at its closest and furthest points?")];
 
-IChatClient client =
+var chatClient =
             new AzureOpenAIClient(
-                new Uri("https://oai-rocketmind-master-ai.openai.azure.com/"),
-                new ApiKeyCredential("9196a00999d04092a63e16e9380ffdaa"))
-                .AsChatClient(modelId: "gpt-4o-mini");
+                new Uri(config["AzureOpenAIText:Endpoint"]!),
+                new ApiKeyCredential(config["AzureOpenAIText:APIKey"]!))
+                .AsChatClient(modelId: config["AzureOpenAIText:Deployment"]!);
 
-var chatConfiguration = new ChatConfiguration(client);
+var chatConfiguration = new ChatConfiguration(chatClient);
 
 var chatOptions =
             new ChatOptions
@@ -31,26 +36,14 @@ var chatOptions =
                 ResponseFormat = ChatResponseFormat.Text
             };
 
+// This should be a call to your AI Chat API (for simplicity we just call directly the LLM)
 var response = await chatConfiguration.ChatClient.GetResponseAsync(chatMessages, chatOptions);
 var modelResponse = response.Message;
 
-var equivalenceEvaluator = new EquivalenceEvaluator();
-var baselineResponseForEquivalenceEvaluator =
-            new EquivalenceEvaluatorContext(
-                """
-                The distance between Earth and Venus varies significantly due to the elliptical orbits of both planets
-                around the Sun. At their closest approach, known as inferior conjunction, Venus can be about 23.6
-                million miles away from Earth. At their furthest point, when Venus is on the opposite side of the Sun
-                from Earth, known as superior conjunction, the distance can be about 162 million miles. These distances
-                can vary slightly due to the specific orbital positions of the planets at any given time.
-                """);
+var relevanceEvaluator = new RelevanceTruthAndCompletenessEvaluator();
+var result = await relevanceEvaluator.EvaluateAsync(chatMessages, modelResponse, chatConfiguration);
+var relevance = result.Get<NumericMetric>(RelevanceTruthAndCompletenessEvaluator.RelevanceMetricName);
 
-var result = await equivalenceEvaluator.EvaluateAsync(
-    modelResponse,
-    chatConfiguration,
-    [baselineResponseForEquivalenceEvaluator]);
-
-var equivalence = result.Get<NumericMetric>(EquivalenceEvaluator.EquivalenceMetricName);
-
-Console.WriteLine($"Equivalence: {equivalence.Value}");
-
+Console.WriteLine($"Relevance value (0-5): {relevance.Value}");
+Console.WriteLine($"Failed?: {relevance.Interpretation!.Failed}");
+Console.WriteLine($"Rating: {relevance.Interpretation!.Rating}");
