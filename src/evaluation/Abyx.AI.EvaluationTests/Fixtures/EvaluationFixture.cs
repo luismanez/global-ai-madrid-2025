@@ -35,7 +35,8 @@ public class EvaluationFixture : IAsyncLifetime
                 evaluators: [
                     new EquivalenceEvaluator(), 
                     new GroundednessEvaluator(), 
-                    new RelevanceTruthAndCompletenessEvaluator(new RelevanceTruthAndCompletenessEvaluatorOptions(true))],
+                    new RelevanceTruthAndCompletenessEvaluator(
+                        new RelevanceTruthAndCompletenessEvaluatorOptions(true))],
                 chatConfiguration: GetAzureOpenAiChatConfiguration(configuration),
                 enableResponseCaching: false,
                 executionName: $"Execution_{DateTime.Now:yyyyMMddTHHmmss}");
