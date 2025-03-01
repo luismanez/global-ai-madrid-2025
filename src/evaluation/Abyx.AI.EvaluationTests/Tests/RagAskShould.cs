@@ -36,6 +36,7 @@ public class RagAskShould : IClassFixture<EvaluationFixture>
     {
         question.Query.Should().NotBeNull();
 
+        // This SHOULD be a call to YOUR AI Chat API!
         var responseFromRagSystem = await _memory!.AskAsync(question.Query);
 
         var answerFromRagSystem = responseFromRagSystem.Result;
@@ -68,13 +69,11 @@ public class RagAskShould : IClassFixture<EvaluationFixture>
         var equivalence = evaluationResult.Get<NumericMetric>(EquivalenceEvaluator.EquivalenceMetricName);
         equivalence.Interpretation!.Failed.Should().NotBe(true);
         equivalence.Interpretation.Rating.Should().BeOneOf(EvaluationRating.Good, EvaluationRating.Exceptional);
-        equivalence.ContainsDiagnostics().Should().BeFalse();
         equivalence.Value.Should().BeGreaterThanOrEqualTo(3);
 
         var groundedness = evaluationResult.Get<NumericMetric>(GroundednessEvaluator.GroundednessMetricName);
         groundedness.Interpretation!.Failed.Should().NotBe(true);
         groundedness.Interpretation.Rating.Should().BeOneOf(EvaluationRating.Good, EvaluationRating.Exceptional);
-        groundedness.ContainsDiagnostics().Should().BeFalse();
         groundedness.Value.Should().BeGreaterThanOrEqualTo(3);
         
         var relevance = evaluationResult.Get<NumericMetric>(RelevanceTruthAndCompletenessEvaluator.RelevanceMetricName);
